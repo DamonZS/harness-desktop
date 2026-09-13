@@ -1,0 +1,139 @@
+name: Desktop release
+
+on:
+  push:
+    tags:
+      - 'V*'
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DSH_DESKTOP_APP_ID: cn.toporeduce.harness
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows installers
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Normalize Windows artifact names
+        shell: pwsh
+        run: |
+          $root = 'apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts'
+          $setup = Get-ChildItem $root -Filter '*-win-x64.exe' -File | Select-Object -First 1
+          $msi = Get-ChildItem $root -Filter '*-win-x64.msi' -File | Select-Object -First 1
+          if ($null -eq $setup -or $null -eq $msi) { throw 'Windows NSIS/MSI artifacts were not produced' }
+          Copy-Item $setup.FullName (Join-Path $root 'windows-x64-setup.exe')
+          Copy-Item $msi.FullName (Join-Path $root 'windows-x64.msi')
+
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: |
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64-setup.exe
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64.msi
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install signing and notarization credentials
+        env:
+          CSC_LINK_B64: ${{ secrets.MACOS_CSC_LINK_B64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          printf '%s' "$CSC_LINK_B64" | base64 --decode > "$RUNNER_TEMP/desktop-signing.p12"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+          {
+            echo "CSC_LINK=$RUNNER_TEMP/desktop-signing.p12"
+            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8"
+            echo "DSH_DESKTOP_MACOS_SIGNING_IDENTITY=${{ secrets.MACOS_SIGNING_IDENTITY }}"
+            echo "DSH_DESKTOP_MACOS_TEAM_ID=${{ secrets.MACOS_TEAM_ID }}"
+            echo "APPLE_API_KEY_ID=${{ secrets.APPLE_API_KEY_ID }}"
+            echo "APPLE_API_ISSUER=${{ secrets.APPLE_API_ISSUER }}"
+            echo "DOWNLOAD_TEST_ORIGIN=https://harness.toporeduce.cn"
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build macOS arm64 installer
+        run: pnpm run package:desktop:mac:arm64
+
+      - name: Normalize macOS artifact name
+        run: |
+          root="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          dmg=$(find "$root" -maxdepth 1 -type f -name '*-mac-arm64.dmg' -print -quit)
+          test -n "$dmg"
+          cp "$dmg" "$root/macos-arm64.dmg"
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/macos-arm64.dmg
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows installers
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows
+          path: release
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos
+          path: release
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/windows-x64-setup.exe release/windows-x64.msi release/macos-arm64.dmg --title "$GITHUB_REF_NAME" --generate-notes
