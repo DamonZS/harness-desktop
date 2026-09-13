@@ -8,6 +8,7 @@ import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { remoteDefaultResponses } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/remote-default-responses.ts'
 import { ok, RemoteMock } from '@deepseek-ai/dsh-remote-mock'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject, refreshIfLoaded } from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE, WELCOME_NOTICE_VERSION,
@@ -16,6 +17,7 @@ import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 import { apply as hostApply } from '../src/index.ts'
+import { createModelsOperations } from '../src/client/operations.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -71,6 +73,21 @@ describe('ui-settings-models apply', () => {
       'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
       'settingsScope', 'settingsSchema',
     ])
+  })
+
+  it('folds a successful settings write into the shared mirror immediately', async () => {
+    const view = {
+      ns: 'llm-pi-ai', schema: {}, value: {}, applies: 'live' as const, secrets: [], revision: 1,
+    }
+    const mutate = vi.fn(() => Promise.resolve(ok(view)))
+    const acceptView = vi.fn()
+    const operations = createModelsOperations(
+      { remote: { settings: { mutate } } } as unknown as Parameters<typeof createModelsOperations>[0],
+      { acceptView } as unknown as SettingsDescribeFace,
+    )
+
+    await expect(operations.writeSettings('llm-pi-ai', [], 0)).resolves.toEqual({ kind: 'written', view })
+    expect(acceptView).toHaveBeenCalledWith(view)
   })
 
   it('registers the models nav entry for declarations before or after apply', async () => {
