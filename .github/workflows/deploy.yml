@@ -1,0 +1,65 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Install rsync and SSH client
+        run: sudo apt-get update && sudo apt-get install --yes rsync openssh-client
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts"
+
+      - name: Synchronize source and build outputs
+        env:
+          SERVER_PATH: /opt/harness-desktop
+        run: |
+          rsync --archive --delete --exclude='.git' --exclude='node_modules' \
+            -e "ssh -i $HOME/.ssh/deploy_key" ./ "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${SERVER_PATH}/"
+
+      - name: Install production dependencies and restart service
+        env:
+          SERVER_PATH: /opt/harness-desktop
+          SERVICE_NAME: toporeduce.service
+        run: |
+          ssh -i "$HOME/.ssh/deploy_key" "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            "cd '${SERVER_PATH}' && pnpm install --frozen-lockfile && sudo systemctl restart '${SERVICE_NAME}' && sudo systemctl is-active --quiet '${SERVICE_NAME}'"
