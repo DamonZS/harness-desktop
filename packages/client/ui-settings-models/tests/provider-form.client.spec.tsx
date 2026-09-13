@@ -36,6 +36,14 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      reasoningEfforts: Schema.dict(
+        Schema.union([Schema.string(), Schema.const(null)]),
+        Schema.union(['off', 'high', 'max']),
+      ),
+      compat: Schema.object({
+        thinkingFormat: Schema.union(['deepseek']),
+        maxTokensField: Schema.union(['max_tokens', 'max_completion_tokens']),
+      }),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -371,6 +379,82 @@ describe('model list editing', () => {
       { id: 'first' },
       { id: 'second', name: 'Second', maxTokens: 2048 },
     ])
+  })
+
+  it('keeps model compat and reasoning efforts while editing visible fields', async () => {
+    const configured = {
+      id: 'deepseek-v4-pro',
+      name: 'DeepSeek V4 Pro',
+      compat: { thinkingFormat: 'deepseek', maxTokensField: 'max_tokens' },
+      reasoningEfforts: { off: null, high: 'high', max: 'max' },
+    }
+    const { mutate } = await mountSection({
+      providers: { topo: { baseURL: 'https://proxy.example/v1', models: [configured] } },
+      declaredRoutes: ['topo'],
+    })
+    openEditor('topo')
+
+    fireEvent.change(screen.getByLabelText(`${en.modelName} 1`), { target: { value: 'Topo V4 Pro' } })
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelMaxTokens} 1`), { target: { value: '8192' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      ...configured,
+      name: 'Topo V4 Pro',
+      maxTokens: 8192,
+    }])
+  })
+
+  it('keeps model compat and reasoning efforts while adopting discovered models', async () => {
+    const configured = {
+      id: 'deepseek-v4-pro',
+      compat: { thinkingFormat: 'deepseek', maxTokensField: 'max_tokens' },
+      reasoningEfforts: { off: null, high: 'high', max: 'max' },
+    }
+    const discover = vi.fn(() => Promise.resolve(ok([{ id: 'deepseek-v4.1-flash' }])))
+    const { mutate } = await mountSection({
+      discover,
+      providers: { topo: { baseURL: 'https://proxy.example/v1', models: [configured] } },
+      declaredRoutes: ['topo'],
+    })
+    openEditor('topo')
+
+    fireEvent.click(screen.getByText(en.fetchModels))
+    await screen.findByText(en.fetchTitle)
+    fireEvent.click(screen.getByText(en.fetchAdopt))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      configured,
+      { id: 'deepseek-v4.1-flash' },
+    ])
+  })
+
+  it('keeps model compat and reasoning efforts after removing another row', async () => {
+    const configured = {
+      id: 'deepseek-v4-pro',
+      compat: { thinkingFormat: 'deepseek', maxTokensField: 'max_tokens' },
+      reasoningEfforts: { off: null, high: 'high', max: 'max' },
+    }
+    const { mutate } = await mountSection({
+      providers: {
+        topo: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'remove-me' }, configured],
+        },
+      },
+      declaredRoutes: ['topo'],
+    })
+    openEditor('topo')
+
+    fireEvent.click(screen.getByLabelText(`${en.removeModel} 1`))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([configured])
   })
 
   it('shows the adapter defaults as inherited until an edit takes them over', async () => {
