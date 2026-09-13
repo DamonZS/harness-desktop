@@ -55,13 +55,20 @@ jobs:
         env:
           SERVER_PATH: /opt/harness-desktop
         run: |
-          rsync --archive --delete --exclude='.git' --exclude='node_modules' \
-            -e "ssh -i $HOME/.ssh/deploy_key" ./ "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${SERVER_PATH}/"
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o ConnectTimeout=15 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          for attempt in 1 2 3; do
+            rsync --archive --delete --exclude='.git' --exclude='node_modules' \
+              -e "ssh $SSH_OPTS" ./ "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${SERVER_PATH}/" && exit 0
+            echo "rsync attempt $attempt failed; retrying"
+            sleep 10
+          done
+          exit 1
 
       - name: Install production dependencies and restart service
         env:
           SERVER_PATH: /opt/harness-desktop
           SERVICE_NAME: toporeduce.service
         run: |
-          ssh -i "$HOME/.ssh/deploy_key" "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+          ssh -i "$HOME/.ssh/deploy_key" -o ConnectTimeout=15 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
             "cd '${SERVER_PATH}' && pnpm install --frozen-lockfile && sudo systemctl restart '${SERVICE_NAME}' && sudo systemctl is-active --quiet '${SERVICE_NAME}'"
