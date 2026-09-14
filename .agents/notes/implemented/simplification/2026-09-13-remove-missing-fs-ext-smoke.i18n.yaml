@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-13-remove-missing-fs-ext-smoke.md
+2026-09-13-remove-missing-fs-ext-smoke.md: a6a18df0bbb3a105d90239973b30603919d8b94f
+2026-09-13-remove-missing-fs-ext-smoke.zh.md: 36cfed2fce340fb2c812982ecc0f692eaedbf05d

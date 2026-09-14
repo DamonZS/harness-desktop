@@ -1486,6 +1486,9 @@ importers:
       '@deepseek-ai/dsh-skill-filesystem':
         specifier: workspace:^
         version: link:../../skill/skill-filesystem
+      '@deepseek-ai/dsh-skill-leila-ac':
+        specifier: workspace:^
+        version: link:../../skill/skill-leila-ac
       '@deepseek-ai/dsh-spill-local':
         specifier: workspace:^
         version: link:../../spill/spill-local
@@ -9013,6 +9016,18 @@ importers:
       '@deepseek-ai/dsh-skill':
         specifier: workspace:^
         version: link:../skill
+
+  packages/skill/skill-leila-ac:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-skill':
+        specifier: workspace:^
+        version: link:../skill
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
 
   packages/skill/tool-skill:
     dependencies:

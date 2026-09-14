@@ -280,6 +280,9 @@
       name: '@deepseek-ai/dsh-skill-badge'
       disabled: true
 
+    - id: skill-leila-ac
+      name: '@deepseek-ai/dsh-skill-leila-ac'
+
     - id: tool-skill
       name: '@deepseek-ai/dsh-tool-skill'
 
