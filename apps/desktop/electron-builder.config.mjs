@@ -105,6 +105,7 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
+      icon: fileURLToPath(new URL('../../packages/skill/skill-badge/assets/dsh-badge.png', import.meta.url)),
       forceCodeSigning: !unsigned,
       signtoolOptions: {
         sign: windowsSigner,

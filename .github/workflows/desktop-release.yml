@@ -61,6 +61,7 @@ jobs:
           if-no-files-found: error
 
   macos:
+    continue-on-error: true
     runs-on: macos-14
     steps:
       - name: Check out source
@@ -135,7 +136,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release/windows-x64-setup.exe release/windows-x64.msi --verify-tag --title "$GITHUB_REF_NAME" --notes "首版 Windows x64 安装包（未签名）：EXE、MSI。macOS DMG 在签名、公证构建成功后另行补充。"
 
   release-macos:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && needs.macos.result == 'success'
     needs: [macos, release]
     runs-on: ubuntu-latest
     steps:
