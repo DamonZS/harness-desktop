@@ -90,6 +90,9 @@ jobs:
           $setup = Get-ChildItem $root -Filter '*-win-x64.exe' -File | Select-Object -First 1
           if ($null -eq $setup) { throw 'Windows NSIS artifact was not produced' }
           Copy-Item $setup.FullName (Join-Path $root 'windows-x64-setup.exe')
+          $msi = Get-ChildItem $root -Filter '*-win-x64.msi' -File | Select-Object -First 1
+          if ($null -eq $msi) { throw 'Windows MSI artifact was not produced' }
+          Copy-Item $msi.FullName (Join-Path $root 'windows-x64.msi')
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
@@ -97,6 +100,7 @@ jobs:
           name: desktop-windows
           path: |
             apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64-setup.exe
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64.msi
           if-no-files-found: error
 
   macos:
@@ -104,7 +108,6 @@ jobs:
       always() && needs.create-version-tag.result == 'success' &&
       (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/'))
     needs: [create-version-tag]
-    continue-on-error: true
     runs-on: macos-14
     steps:
       - name: Check out source
@@ -123,34 +126,15 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install signing and notarization credentials
-        env:
-          CSC_LINK_B64: ${{ secrets.MACOS_CSC_LINK_B64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        run: |
-          printf '%s' "$CSC_LINK_B64" | base64 --decode > "$RUNNER_TEMP/desktop-signing.p12"
-          printf '%s' "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
-          {
-            echo "CSC_LINK=$RUNNER_TEMP/desktop-signing.p12"
-            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD"
-            echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8"
-            echo "DSH_DESKTOP_MACOS_SIGNING_IDENTITY=${{ secrets.MACOS_SIGNING_IDENTITY }}"
-            echo "DSH_DESKTOP_MACOS_TEAM_ID=${{ secrets.MACOS_TEAM_ID }}"
-            echo "APPLE_API_KEY_ID=${{ secrets.APPLE_API_KEY_ID }}"
-            echo "APPLE_API_ISSUER=${{ secrets.APPLE_API_ISSUER }}"
-            echo "DOWNLOAD_TEST_ORIGIN=https://harness.toporeduce.cn"
-          } >> "$GITHUB_ENV"
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build macOS arm64 installer
-        run: pnpm run package:desktop:mac:arm64
+        run: pnpm run package:desktop:mac:arm64:unsigned
 
       - name: Normalize macOS artifact name
         run: |
-          root="apps/desktop/.desktop-build/targets/mac-arm64/artifacts"
+          root="apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts"
           dmg=$(find "$root" -maxdepth 1 -type f -name '*-mac-arm64.dmg' -print -quit)
           test -n "$dmg"
           cp "$dmg" "$root/macos-arm64.dmg"
@@ -159,14 +143,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-macos
-          path: apps/desktop/.desktop-build/targets/mac-arm64/artifacts/macos-arm64.dmg
+          path: apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/macos-arm64.dmg
           if-no-files-found: error
 
   release:
     if: >-
       always() && needs.create-version-tag.result == 'success' &&
       needs.windows.result == 'success'
-    needs: [create-version-tag, windows]
+    needs: [create-version-tag, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows installers
@@ -175,29 +159,16 @@ jobs:
           name: desktop-windows
           path: release
 
-      - name: Publish GitHub release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          tag='${{ needs.create-version-tag.outputs.tag }}'
-          gh release create "$tag" release/windows-x64-setup.exe --verify-tag --title "$tag" --notes "Windows x64 未签名 EXE 安装包。MSI 与 macOS DMG 在对应签名构建配置完成后补充。"
-
-  release-macos:
-    if: >-
-      always() && needs.create-version-tag.result == 'success' &&
-      needs.macos.result == 'success' && needs.release.result == 'success'
-    needs: [create-version-tag, macos, release]
-    runs-on: ubuntu-latest
-    steps:
       - name: Download macOS installer
         uses: actions/download-artifact@v4
         with:
           name: desktop-macos
           path: release
 
-      - name: Attach macOS installer
+      - name: Publish GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload '${{ needs.create-version-tag.outputs.tag }}' release/macos-arm64.dmg
+        run: |
+          tag='${{ needs.create-version-tag.outputs.tag }}'
+          gh release create "$tag" release/windows-x64-setup.exe release/windows-x64.msi release/macos-arm64.dmg --verify-tag --title "$tag" --notes "Windows x64 EXE、MSI 与 macOS arm64 DMG 安装包。"

@@ -34,7 +34,7 @@ export function createElectronBuilderConfig(
     throw new Error('desktop package: DSH_DESKTOP_UNSIGNED must be 0 or 1')
   }
   const unsigned = env.DSH_DESKTOP_UNSIGNED === '1'
-  if (unsigned && resolvedPlatform !== 'win32') throw new Error('desktop package: unsigned builds require Windows')
+  if (unsigned && !['win32', 'darwin'].includes(resolvedPlatform)) throw new Error('desktop package: unsigned builds require Windows or macOS')
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = targetPlatform === 'win32'
   const macOSSigning = packagesMacOS ? resolveMacOSSigningEnvironment(env) : undefined
@@ -73,15 +73,15 @@ export function createElectronBuilderConfig(
     mac: {
       category: 'public.app-category.developer-tools',
       identity: macOSSigning?.signingIdentity,
-      forceCodeSigning: true,
+      forceCodeSigning: !unsigned,
       hardenedRuntime: true,
       // Native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
       signIgnore: ['/Contents/Resources/dsh(?:/|$)', '\\.pak$'],
-      notarize: true,
-      target: ['dmg', 'zip'],
+      notarize: !unsigned,
+      target: ['dmg'],
     },
     dmg: {
-      sign: true,
+      sign: !unsigned,
       writeUpdateInfo: false,
     },
     afterPack: async context => {
@@ -111,7 +111,7 @@ export function createElectronBuilderConfig(
         sign: windowsSigner,
         signingHashAlgorithms: ['sha256'],
       },
-      target: unsigned ? ['nsis'] : ['nsis', 'msi'],
+      target: unsigned ? ['nsis', 'msi'] : ['nsis', 'msi'],
     },
     linux: {
       category: 'Development',
