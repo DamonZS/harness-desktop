@@ -46,10 +46,8 @@ jobs:
         run: |
           $root = 'apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts'
           $setup = Get-ChildItem $root -Filter '*-win-x64.exe' -File | Select-Object -First 1
-          $msi = Get-ChildItem $root -Filter '*-win-x64.msi' -File | Select-Object -First 1
-          if ($null -eq $setup -or $null -eq $msi) { throw 'Windows NSIS/MSI artifacts were not produced' }
+          if ($null -eq $setup) { throw 'Windows NSIS artifact was not produced' }
           Copy-Item $setup.FullName (Join-Path $root 'windows-x64-setup.exe')
-          Copy-Item $msi.FullName (Join-Path $root 'windows-x64.msi')
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
@@ -57,7 +55,6 @@ jobs:
           name: desktop-windows
           path: |
             apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64-setup.exe
-            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/windows-x64.msi
           if-no-files-found: error
 
   macos:

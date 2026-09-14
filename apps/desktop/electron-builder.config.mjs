@@ -111,7 +111,7 @@ export function createElectronBuilderConfig(
         sign: windowsSigner,
         signingHashAlgorithms: ['sha256'],
       },
-      target: ['nsis', 'msi'],
+      target: unsigned ? ['nsis'] : ['nsis', 'msi'],
     },
     linux: {
       category: 'Development',
