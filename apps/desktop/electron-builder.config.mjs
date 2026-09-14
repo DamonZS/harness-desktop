@@ -38,7 +38,7 @@ export function createElectronBuilderConfig(
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = targetPlatform === 'win32'
   const macOSSigning = packagesMacOS ? resolveMacOSSigningEnvironment(env) : undefined
-  if (packagesMacOS) resolveMacOSNotarizationEnvironment(env)
+  if (packagesMacOS && !unsigned) resolveMacOSNotarizationEnvironment(env)
   const windowsSigner = packagesWindows && !unsigned
     ? createWindowsTokenSigner({
         certificateFile: env.DSH_DESKTOP_WINDOWS_CER_FILE,
@@ -91,6 +91,7 @@ export function createElectronBuilderConfig(
     },
     afterSign: async context => {
       if (context.electronPlatformName !== 'darwin') return
+      if (unsigned) return
       const { verifyDesktopRuntime } = await import('./lib/types/runtime-tree.js')
       await verifyDesktopRuntime(join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents', 'Resources', 'dsh'),
         context.packager.appInfo.version, { platform: 'darwin', arch: resolvedArch })
@@ -98,6 +99,7 @@ export function createElectronBuilderConfig(
     },
     artifactBuildCompleted: artifact => {
       if (!artifact.file.endsWith('.dmg')) return
+      if (unsigned) return
       return notarizeMacOSDiskImageArtifact(
         artifact,
         env,
