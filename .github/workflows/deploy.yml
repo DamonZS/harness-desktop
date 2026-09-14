@@ -42,7 +42,7 @@ jobs:
 
       - name: Check deployment endpoint
         env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST || '106.52.34.109' }}
+          SERVER_HOST: 106.52.34.109
           SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
         run: |
           echo "Checking ${SERVER_HOST}:${SERVER_PORT}"
@@ -63,7 +63,7 @@ jobs:
       - name: Synchronize source and build outputs
         env:
           SERVER_PATH: /opt/harness-desktop
-          SERVER_HOST: ${{ secrets.SERVER_HOST || '106.52.34.109' }}
+          SERVER_HOST: 106.52.34.109
           SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
           SERVER_USER: ${{ secrets.SERVER_USER || 'root' }}
         run: |
@@ -80,7 +80,7 @@ jobs:
         env:
           SERVER_PATH: /opt/harness-desktop
           SERVICE_NAME: toporeduce.service
-          SERVER_HOST: ${{ secrets.SERVER_HOST || '106.52.34.109' }}
+          SERVER_HOST: 106.52.34.109
           SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
           SERVER_USER: ${{ secrets.SERVER_USER || 'root' }}
         run: |
