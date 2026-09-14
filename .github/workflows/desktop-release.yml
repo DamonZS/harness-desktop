@@ -95,7 +95,7 @@ jobs:
           Copy-Item $msi.FullName (Join-Path $root 'windows-x64.msi')
 
       - name: Upload Windows installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-windows
           path: |
@@ -140,7 +140,7 @@ jobs:
           cp "$dmg" "$root/macos-arm64.dmg"
 
       - name: Upload macOS installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-macos
           path: apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/macos-arm64.dmg
