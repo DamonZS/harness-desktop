@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-desktop-github-release-workflow.md
-2026-09-13-desktop-github-release-workflow.md: f0bffb127c1676d8ab473084bd420efee7b26bca
-2026-09-13-desktop-github-release-workflow.zh.md: a1a0dbed80a83032013e8508378a2b01ad2d2faa
+2026-09-13-desktop-github-release-workflow.md: 774ce9ac7ab9012106b1d4c331f726334af49f21
+2026-09-13-desktop-github-release-workflow.zh.md: 8df6b6f0f2d46a80814d0aa06f8f247864d63bf5

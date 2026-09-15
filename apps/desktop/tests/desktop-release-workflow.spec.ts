@@ -27,6 +27,8 @@ describe('desktop release workflow', () => {
     expect(workflow.concurrency['cancel-in-progress']).toBe(false)
     for (const platform of ['windows', 'macos']) {
       expect(workflow.jobs[platform]!.steps[0]!.with?.ref).toBe('${{ github.sha }}')
+      const node = workflow.jobs[platform]!.steps.find(step => step.name === 'Set up Node.js')!
+      expect(node.with?.['node-version']).toBe('22.23.2')
     }
     expect(workflow.jobs.release!.needs).toEqual(['create-version-tag', 'windows', 'macos'])
     expect(workflow.jobs.release!.if).toBeUndefined()
@@ -50,6 +52,7 @@ describe('desktop release workflow', () => {
 
   it.each([
     { releases: 'v0.01\nv0.02', requested: '', expected: 'v0.03' },
+    { releases: 'v0.01\nv0.02\nv0.03', requested: '', expected: 'v0.04' },
     { releases: '', requested: '', expected: 'v0.01' },
     { releases: 'v0.09', requested: '', expected: 'v0.10' },
     { releases: 'v0.99', requested: '', expected: 'v1.00' },

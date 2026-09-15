@@ -8,7 +8,6 @@ import {
   type ConnectionSinks,
   type ConnectionState,
 } from './connection.ts'
-import { createFixtureConnectionRpc } from './fixture.ts'
 import { createWebConnectionRpc, type RpcFetch, type RpcStreamOpen } from './rpc.ts'
 import { isLoopbackHostname } from '../loopback-hostname.ts'
 import { isTrustedAuthority } from '../api-request-trust.ts'
@@ -73,10 +72,10 @@ export interface ConnectionStateSource {
 export const inject: string[] = []
 
 /**
- * Carrier override installed on the page global before plugin boot. The served
- * web app leaves it unset and gets HTTP + WebSocket; a shell that owns a
- * different physical transport (the worker preview's postMessage tunnel)
- * provides both halves here instead of forking this plugin.
+ * Physical carrier selected when the Connection service is installed. The
+ * served web app omits it and gets HTTP + WebSocket; a shell that owns a
+ * different transport (the worker preview's postMessage tunnel) provides both
+ * halves instead of forking this plugin.
  */
 export interface ClientTransportHooks {
   /**
@@ -113,6 +112,25 @@ interface ClientTransportGlobal {
   __DSH_CONNECTION_TRUSTED_HOSTS__?: unknown
 }
 
+/** Browser location fields used to classify loopback and configured authorities. */
+export interface ConnectionLocation {
+  readonly hostname: string
+  /** Browser authority including an explicit non-default port. */
+  readonly host?: string
+}
+
+/** Instance-local inputs for installing a Connection service. */
+export interface ConnectionInstallOptions {
+  /** Explicit physical carrier; omit for the browser HTTP + WebSocket carrier. */
+  readonly transport?: ClientTransportHooks
+  /** Reconnect timing overrides; omitted fields use controller defaults. */
+  readonly recovery?: ConnectionRecoveryConfig
+  /** Page location; omit for a non-browser composition. */
+  readonly location?: ConnectionLocation
+  /** Deployment authorities supplied by the Host bootstrap. */
+  readonly trustedHosts?: readonly string[]
+}
+
 /**
  * The ctx.connection service API. API Gateway supplies generation readiness
  * and reset callbacks; Connection stays independent of downstream domain state.
@@ -120,7 +138,7 @@ interface ClientTransportGlobal {
 export interface ConnectionHandle {
   /**
    * Whether the privileged surface is reachable: the page authority is
-   * loopback, the transport declares the page owns the Host
+   * loopback or explicitly trusted, the transport declares the page owns the Host
    * ({@link ClientTransportHooks.ownsHost}), or the context is not a browser.
    */
   readonly isLoopback: boolean
@@ -184,15 +202,14 @@ function watchBrowserNetwork(controller: ConnectionController): () => void {
 }
 
 /**
- * Client plugin body: pick physical carriers by page mode and provide ctx.connection.
- * @param ctx - client cordis context.
+ * Install one Context-owned Connection service from explicit composition inputs.
+ * @param ctx - client Cordis context.
+ * @param options - physical carrier, reconnect timing, page location, and trusted authorities.
  */
-export function apply(ctx: Context): void {
-  const pageLocation = typeof location === 'undefined' ? undefined : location
-  const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
-  const fixtureRpc = fixture ? createFixtureConnectionRpc() : undefined
-  const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
-  const trustedHosts = (globalThis as ClientTransportGlobal).__DSH_CONNECTION_TRUSTED_HOSTS__
+export function installConnection(ctx: Context, options: ConnectionInstallOptions = {}): void {
+  const pageLocation = options.location
+  const transport = options.transport
+  const trustedHosts = options.trustedHosts ?? []
   const pageAuthority = pageLocation === undefined
     ? undefined
     : typeof pageLocation.host === 'string' && pageLocation.host !== ''
@@ -202,13 +219,14 @@ export function apply(ctx: Context): void {
     ? false
     : (() => {
       try {
-        return isTrustedAuthority(new URL(`http://${pageAuthority}`), Array.isArray(trustedHosts) ? trustedHosts.filter((entry): entry is string => typeof entry === 'string') : [])
+        return isTrustedAuthority(new URL(`http://${pageAuthority}`), trustedHosts)
       } catch {
+        // Blank page authorities such as about:blank grant no deployment trust.
         return false
       }
     })()
-  const recovery = resolveConnectionConfig((globalThis as ClientTransportGlobal).__DSH_CONNECTION_RECOVERY__)
-  const rpc = fixtureRpc ?? transport?.rpc ?? createWebConnectionRpc(transport?.fetch, transport?.openStream)
+  const recovery = options.recovery ?? {}
+  const rpc = transport?.rpc ?? createWebConnectionRpc(transport?.fetch, transport?.openStream)
   let generationSource: ConnectionGenerationSource | undefined
   let owner: ConnectionOwner | undefined
   let generationId = 0
@@ -310,4 +328,21 @@ export function apply(ctx: Context): void {
     },
   }
   ctx.provide('connection', handle)
+}
+
+/**
+ * Client plugin body: read the page composition and install its Connection service.
+ * @param ctx - client Cordis context.
+ */
+export function apply(ctx: Context): void {
+  const globals = globalThis as ClientTransportGlobal
+  const pageLocation = typeof location === 'undefined' ? undefined : location
+  const transport = globals.__DSH_TRANSPORT__
+  const trustedHosts = globals.__DSH_CONNECTION_TRUSTED_HOSTS__
+  installConnection(ctx, {
+    ...(transport === undefined ? {} : { transport }),
+    recovery: resolveConnectionConfig(globals.__DSH_CONNECTION_RECOVERY__),
+    ...(pageLocation === undefined ? {} : { location: pageLocation }),
+    trustedHosts: Array.isArray(trustedHosts) ? trustedHosts.filter((entry): entry is string => typeof entry === 'string') : [],
+  })
 }

@@ -11,6 +11,14 @@ English | [中文](README.zh.md)
 
 This package carries the source-level Leila resource set: the `ac` router skill, the `leila-identity` skill, and the global direct-execution instruction file. It registers the two skills through `ctx.skills` and adds the instruction file to `ctx.systemPrompt`, so the same behavior is available to CLI, Web, and Desktop profiles.
 
+## Table of Contents
+
+- [Use this package](#use-this-package)
+- [Source map](#source-map)
+- [Dev Note](#dev-note)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+
 ## Use this package
 
 The `dsh-base` bundle mounts this package by default. A profile patch can disable the `skill-leila-ac` row when a deployment does not want the global instruction section. The provider reads skill bodies on demand and keeps the packaged `assets/` directory as their resource base.
@@ -23,6 +31,10 @@ The `dsh-base` bundle mounts this package by default. A profile patch can disabl
 | [`assets/gpt5.5-unrestricted.md`](assets/gpt5.5-unrestricted.md) | Global direct-execution instructions |
 | [`assets/ac/SKILL.md`](assets/ac/SKILL.md) | AC route selection and delivery contract |
 | [`assets/leila-identity/SKILL.md`](assets/leila-identity/SKILL.md) | Leila identity response |
+
+## Dev Note
+
+See the [source integration note](../../../.agents/notes/implemented/feature/2026-09-14-leila-ac-source-integration.md).
 
 ## Model Experience
 

@@ -66,7 +66,7 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 
 ### Background processes
 
-Call `start` to run a command in the background; it returns a handle immediately and no timeout applies. `readOutput()` merges the stream deltas into one consuming read, marking stderr under a `[stderr]` section; `kill()` terminates the provider-managed range; `done` settles when the direct command closes and never rejects. Job ids, ownership, polling, and notices belong to the generic `ctx.jobs` runtime, which the tool layer registers the handle with.
+Await `start` to run a command in the background; it resolves with the prepared process handle and no execution timeout applies. Cancellation or preparation failure rejects before a handle is published. `readOutput()` merges the stream deltas into one consuming read, marking stderr under a `[stderr]` section; `kill()` terminates the provider-managed range; `done` settles when the direct command closes and never rejects. Job ids, ownership, polling, and notices belong to the generic `ctx.jobs` runtime, which the tool layer registers the handle with.
 
 <a id="adjusting-budgets-at-runtime"></a>
 ### Adjusting budgets at runtime
@@ -99,6 +99,8 @@ The executor is the PowerShell Service Provider for the `ctx.shell` seam built o
 ### Main flow
 
 A call runs through three steps: `resolve()` fills `workdir`/`timeoutMs`/`stdoutMaxBytes` from config (capping the per-call `timeoutMs` override); the executor builds the pwsh argv — `pwsh -NoLogo -NoProfile -NonInteractive -Command <encoding preamble + command>` — fuses the config-clamped timeout with the caller's abort signal into one deadline, and spawns through `ctx.subprocess` with explicit byte caps and the `graceMs`; the settled outcome is classified and projected into a `ShellRunResult`. Windows reports forced termination as exit 1 without a signal, so signal-stamped facts are POSIX-only there; the timeout/abort classification is platform-independent.
+
+The foreground deadline starts before argv preparation and retains the same signal and remaining budget through execution. Preparation timeout returns empty output, `timedOut: true`, and null `exitCode` and `signal`; caller cancellation before process publication still rejects. Late preparation success or failure cannot trigger a spawn.
 
 ### Invariants and ownership
 
@@ -141,6 +143,7 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 These limits define when this executor is a poor fit. They are current package constraints, not a roadmap.
 
 - **Unconfined by itself** — commands run with the harness process's authority; deployments needing confinement compose a sandboxing executor or policy instead.
+- **Cancellation during managed startup** — when the provider rejects with the active signal's exact reason, foreground execution waits for process cleanup and reports `timedOut` or `aborted` with no exit outcome; unrelated provider failures still reject.
 - **No persistent shell or PTY** — every call starts a fresh `pwsh -Command`.
 - **The command string is PowerShell text** — the `-Command` domain has no shell-quoting layer, but a model-facing command is parsed by PowerShell itself, so PowerShell syntax errors are command failures, not launch failures.
 - **A background provider-failure note is single-delivery** — `SubprocessHandle.done` can reject before or after target execution begins, so the executor injects the stage-neutral `subprocess failed before reporting an outcome: …` into exactly one `readOutput()` delta; a reader that discards that delta cannot recover it.

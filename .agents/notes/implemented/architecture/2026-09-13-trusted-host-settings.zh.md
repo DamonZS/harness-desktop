@@ -1,6 +1,23 @@
----
-title: Trusted web authorities enable persistent browser settings
-status: implemented
----
+# Agent Note: 可信 Web 来源启用持久化浏览器设置
 
-连接 Host 插件把已校验的 `trustedHosts` 注入每个服务页面。客户端复用 Host authority 匹配器计算 `ctx.connection.isLoopback`，因此显式配置的部署域名可以使用 Host 设置文档，未列入名单的远程来源仍保持内存模式。Host/Origin 信任与浏览器令牌认证不变。
+Status: implemented
+
+[English](2026-09-13-trusted-host-settings.md) | 中文
+
+## 问题
+
+部署后的浏览器需要持久化模型设置，但客户端默认将所有非回环主机名归类为仅内存模式。
+
+## 决策
+
+连接 Host 插件把已校验的 `trustedHosts` 注入每个服务页面。客户端将该列表传入实例级 `installConnection` 选项，并复用 Host authority 匹配器计算 `ctx.connection.isLoopback`，匹配包含显式端口。显式配置的部署域名可以使用 Host 设置文档，未列入名单的远程来源仍保持内存模式。Host/Origin 信任与浏览器令牌认证不变。
+
+## 考虑过的替代方案
+
+**将所有远程页面视为本地页面。** 这会在未显式配置部署信任的情况下暴露特权设置控件。
+
+**在每个安装函数中读取全局配置。** 这会让 worker 和测试上下文依赖无关的页面状态。仅浏览器插件适配层读取引导全局变量。
+
+## 影响
+
+部署方保留显式的来源列表。客户端测试覆盖可信主机、主机与端口不匹配以及空来源；Host 测试覆盖引导注入和销毁清理。这些检查验证设置的可达性，不替代请求认证。

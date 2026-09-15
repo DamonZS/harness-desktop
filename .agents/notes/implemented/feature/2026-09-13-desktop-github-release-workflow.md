@@ -12,6 +12,8 @@ The Desktop release workflow runs native Windows and macOS arm64 jobs against th
 
 Main pushes and manual dispatch select the next version from published releases, not orphaned tags. A manual version input permits retrying an unpublished version. Tags are written after artifacts exist; an unpublished tag left by a failed build may move with an exact lease. Published releases are never replaced.
 
+Packaging jobs pin their build host to Node.js 22.23.2, independently of the bundled application runtime. Node.js 24.17.0 exits with an unsettled top-level await while `extract-zip` processes the verified Windows runtime archive; the Node.js 22 build host completes that extraction. The application retains the upstream ASAR layout with native files unpacked.
+
 ## Alternatives considered
 **Cross-building every target on one Ubuntu runner:** rejected because the Desktop packaging script requires a native Windows host for `win-x64` and a macOS host for macOS targets.
 

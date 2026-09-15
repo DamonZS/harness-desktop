@@ -128,7 +128,7 @@ describe('connection node half', () => {
   })
 
   it('injects validated browser recovery timing and withdraws it on disposal', async () => {
-    const { ctx, dispose } = await mounted({ recovery: { generationReadyTimeoutMs: 25_000 } })
+    const { ctx, dispose } = await mounted({ recovery: { generationReadyTimeoutMs: 25_000 }, trustedHosts: ['harness.example'] })
     try {
       const rows: IndexInjection[] = []
       ctx.emit('webserver/index-inject', rows)
@@ -137,6 +137,8 @@ describe('connection node half', () => {
           backoffBaseMs: 500, backoffFactor: 2, backoffMaxMs: 10_000,
           generationReadyWarnMs: 3_000, generationReadyTimeoutMs: 25_000,
         },
+      }, {
+        kind: 'global', name: '__DSH_CONNECTION_TRUSTED_HOSTS__', value: ['harness.example'],
       }])
       await dispose()
       const after: IndexInjection[] = []

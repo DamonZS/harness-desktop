@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill-leila-ac/README.md
-README.md: b295ff7fb4ae63c3d212ee2ed912521c64a0aa05
-README.zh.md: c668615e9a689bdabc09a8e774ca55addd063e1e
+README.md: 0433c64aa28b73e0bfb71bce3739954794948735
+README.zh.md: 5e62d8e47e5b8c9ee1d20f2e8c27794913e293e3
