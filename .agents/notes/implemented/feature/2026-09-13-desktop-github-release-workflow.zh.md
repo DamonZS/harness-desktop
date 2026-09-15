@@ -10,7 +10,9 @@ Status: implemented
 
 ## 决策
 
-桌面发布 workflow 使用原生 Windows 和 macOS arm64 job。Windows electron-builder 的目标为 `nsis` 和 `msi`；workflow 将生成的安装包复制为 `windows-x64-setup.exe` 和 `windows-x64.msi`。macOS job 构建已签名并公证的 arm64 DMG，并复制为 `macos-arm64.dmg`。标签触发的 release job 将这三个文件发布到 GitHub release。
+桌面发布 workflow 使用原生 Windows 和 macOS arm64 job，构建触发工作流的提交。Windows electron-builder 的目标为 `nsis` 和 `msi`；workflow 将安装包复制为 `windows-x64-setup.exe` 和 `windows-x64.msi`。WiX 使用较短输出目录以避开路径长度限制。macOS job 构建临时签名、未经公证的 DMG，命名为 `macos-arm64.dmg`，并保留独立的凭据签名打包命令。两个平台均成功后，恰好包含三个文件的草稿才公开发布。
+
+Main 推送和手动操作从已发布 Release 选择下一个版本，不使用孤立标签计算。手动版本输入支持重试尚未发布的版本。标签在产物齐全后写入；失败构建遗留的未发布标签可通过精确租约保护移动。已发布 Release 始终保留，不被替换。
 
 ## 取舍
 
@@ -20,4 +22,4 @@ Status: implemented
 
 ## 影响
 
-匹配 `V*` 或 `v*` 的标签会生成包含三个固定名称安装包的 GitHub release。macOS 发布需要仓库 Secret 提供签名证书、证书密码、签名身份、Team ID 和 App Store Connect API key 凭据。Windows 产物当前未签名，可能显示 Windows 安全警告。
+GitHub 产物不要求签名 Secret。Windows 安全警告和 macOS Gatekeeper 限制仍然存在；发布说明注明 Windows 未签名、macOS 未公证。打包测试覆盖无凭据配置与工作流命令解析；Shell 测试验证版本递增、无效输入和已发布版本拦截。原生 Actions 构建在公开发布前验证 MSI 与 DMG 产物。

@@ -145,6 +145,10 @@ pnpm run package:desktop:win:x64:unsigned
 
 The command requires `DSH_DESKTOP_APP_ID` and the normal build dependencies, including Python and Visual C++ build tools for native modules. Set `PYTHON` to the Python executable when it is absent from `PATH`. It writes the installer to `.desktop-build/targets/win-x64/unsigned-artifacts/`, omits automatic-update configuration, strips signing credentials, and creates no release completion record. It does not require EV credentials or an update origin. The signed packaging and upload commands retain their release requirements.
 
+The unsigned Windows command produces both NSIS EXE and MSI. Set `DSH_DESKTOP_UNSIGNED_OUTPUT` to a short absolute directory such as `D:/out` when WiX encounters Windows path-length limits. On Apple Silicon, `pnpm run package:desktop:mac:arm64:unsigned` produces `.desktop-build/targets/mac-arm64/unsigned-artifacts/` with an ad-hoc-signed DMG, without Developer ID credentials, notarization, updater metadata, or a release completion record. Gatekeeper may block this download; it is not a notarized release. The signed commands retain their existing certificate and notarization checks.
+
+The [GitHub workflow](../../.github/workflows/desktop-release.yml) builds on pushes to `main` and manual dispatch. It increments the latest published version by 0.01; failed builds do not reserve a version. The optional `version` input retries an unpublished version. EXE, MSI, and DMG must all finish before the release becomes public. Only unpublished tags from failed builds may be updated to the actual build commit, using a lease.
+
 ### Windows EV signing
 
 Windows packaging fixes the 7-Zip filter to `BCJ` for compatibility with the bundled NSIS decoder. This preserves ARM64 binaries carried by dependencies in x64 installers; automatic ARM64 filtering produces entries that this decoder cannot extract.

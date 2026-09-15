@@ -37,7 +37,7 @@ export function createElectronBuilderConfig(
   if (unsigned && !['win32', 'darwin'].includes(resolvedPlatform)) throw new Error('desktop package: unsigned builds require Windows or macOS')
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = targetPlatform === 'win32'
-  const macOSSigning = packagesMacOS ? resolveMacOSSigningEnvironment(env) : undefined
+  const macOSSigning = packagesMacOS && !unsigned ? resolveMacOSSigningEnvironment(env) : undefined
   if (packagesMacOS && !unsigned) resolveMacOSNotarizationEnvironment(env)
   const windowsSigner = packagesWindows && !unsigned
     ? createWindowsTokenSigner({
@@ -56,7 +56,7 @@ export function createElectronBuilderConfig(
     appId,
     productName: 'DeepSeek Harness',
     artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
-    directories: { output: unsigned ? join(buildPaths.root, 'unsigned-artifacts') : buildPaths.artifacts },
+    directories: { output: unsigned ? env.DSH_DESKTOP_UNSIGNED_OUTPUT ?? join(buildPaths.root, 'unsigned-artifacts') : buildPaths.artifacts },
     asar: true,
     files: [
       'lib/*.js',
@@ -72,13 +72,13 @@ export function createElectronBuilderConfig(
     ],
     mac: {
       category: 'public.app-category.developer-tools',
-      identity: macOSSigning?.signingIdentity,
+      identity: unsigned ? '-' : macOSSigning?.signingIdentity,
       forceCodeSigning: !unsigned,
-      hardenedRuntime: true,
+      hardenedRuntime: !unsigned,
       // Native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
       signIgnore: ['/Contents/Resources/dsh(?:/|$)', '\\.pak$'],
       notarize: !unsigned,
-      target: ['dmg'],
+      target: unsigned ? ['dmg'] : ['dmg', 'zip'],
     },
     dmg: {
       sign: !unsigned,
@@ -113,7 +113,7 @@ export function createElectronBuilderConfig(
         sign: windowsSigner,
         signingHashAlgorithms: ['sha256'],
       },
-      target: unsigned ? ['nsis', 'msi'] : ['nsis', 'msi'],
+      target: ['nsis', 'msi'],
     },
     linux: {
       category: 'Development',

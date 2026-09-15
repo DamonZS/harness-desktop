@@ -130,15 +130,35 @@ describe('desktop macOS release signature', () => {
     expect(portablePath(config.directories.output)).toContain('/targets/win-x64/unsigned-artifacts')
     expect(portablePath(config.nsis.include)).toMatch(/\/scripts\/installer\.nsh$/u)
     expect(config).toMatchObject({
-      win: { forceCodeSigning: false, signtoolOptions: { sign: undefined } },
+      win: { forceCodeSigning: false, signtoolOptions: { sign: undefined }, target: ['nsis', 'msi'] },
       publish: null,
     })
   })
 
-  it('rejects unsigned macOS builds and malformed signing modes', async () => {
+  it('packages ad-hoc macOS DMG without release credentials or notarization', async () => {
     const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
-    expect(() => createElectronBuilderConfig({ ...RELEASE_ENVIRONMENT, DSH_DESKTOP_UNSIGNED: '1' }))
-      .toThrow(/unsigned builds require Windows/u)
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
+      DSH_DESKTOP_UNSIGNED: '1',
+    }, 'darwin', 'arm64')
+    expect(config).toMatchObject({
+      mac: { identity: '-', forceCodeSigning: false, hardenedRuntime: false, notarize: false, target: ['dmg'] },
+      dmg: { sign: false }, publish: null,
+    })
+    expect(config.artifactBuildCompleted({ file: 'test.dmg' })).toBeUndefined()
+  })
+
+  it('uses a short unsigned artifact path for WiX', async () => {
+    const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: RELEASE_ENVIRONMENT.DSH_DESKTOP_APP_ID,
+      DSH_DESKTOP_UNSIGNED: '1', DSH_DESKTOP_UNSIGNED_OUTPUT: 'D:/out',
+    }, 'win32', 'x64')
+    expect(config.directories.output).toBe('D:/out')
+  })
+
+  it('rejects malformed signing modes', async () => {
+    const { createElectronBuilderConfig } = await import('../electron-builder.config.mjs')
     expect(() => createElectronBuilderConfig({ ...RELEASE_ENVIRONMENT, DSH_DESKTOP_UNSIGNED: 'yes' }))
       .toThrow(/must be 0 or 1/u)
   })

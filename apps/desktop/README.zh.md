@@ -145,6 +145,10 @@ pnpm run package:desktop:win:x64:unsigned
 
 该命令要求设置 `DSH_DESKTOP_APP_ID` 并具备常规构建依赖，包括编译原生模块所需的 Python 和 Visual C++ 构建工具。Python 不在 `PATH` 中时，将 `PYTHON` 设置为其可执行文件路径。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/`，省略自动更新配置，清除签名凭据，且不生成发布完成记录。它不需要 EV 凭据或更新源地址。签名打包和上传命令仍遵循正式发布要求。
 
+未签名 Windows 命令同时生成 NSIS EXE 和 MSI。WiX 遇到 Windows 路径长度限制时，可将 `DSH_DESKTOP_UNSIGNED_OUTPUT` 设置为 `D:/out` 等较短的绝对目录。Apple Silicon 上的 `pnpm run package:desktop:mac:arm64:unsigned` 在 `.desktop-build/targets/mac-arm64/unsigned-artifacts/` 生成临时签名 DMG，不要求 Developer ID 凭据，不执行公证，不生成更新元数据或发布完成记录。Gatekeeper 可能阻止该下载，它不是公证发行版。签名命令保留原有证书与公证检查。
+
+[GitHub 工作流](../../.github/workflows/desktop-release.yml)由 `main` 推送和手动操作触发，以最新已发布版本递增 0.01；失败构建不占用版本号。可选 `version` 输入用于重试尚未发布的版本。EXE、MSI 和 DMG 全部构建完成后才公开 Release。只有失败构建留下的未发布标签可以通过租约保护更新为实际构建提交。
+
 ### Windows EV 签名
 
 Windows 打包将 7-Zip 过滤器固定为 `BCJ`，以兼容内置的 NSIS 解码器。这样可以保留 x64 安装包中由依赖携带的 ARM64 二进制文件；自动 ARM64 过滤会生成该解码器无法解压的条目。
